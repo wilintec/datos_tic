@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Beta-convergencia interactiva con datos reales</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 28px;
+    background: #f7f9fc;
+    color: #222;
+  }
+  .container {
+    max-width: 1220px;
+    margin: auto;
+    background: #fff;
+    padding: 26px;
+    border-radius: 14px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  }
+  h1 { margin: 0 0 8px 0; font-size: 28px; }
+  .subtitle {
+    color: #555;
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 140px;
+    gap: 12px 18px;
+    align-items: center;
+    margin: 12px 0 20px 0;
+  }
+  .controls label { font-weight: bold; }
+  .controls input[type=range] { width: 100%; }
+  .valueBox {
+    background: #eef2ff;
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .metric {
+    background: #f8f9fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .metric-highlight {
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+  .metric span {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 6px;
+  }
+  .metric strong { font-size: 18px; }
+  .formula-box {
+    background: #f7f7f7;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    line-height: 1.8;
+  }
+  .formula-line { font-size: 16px; }
+  .note {
+    font-size: 14px;
+    line-height: 1.6;
+    background: #f1f3f5;
+    border-left: 4px solid #6c757d;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 18px;
+  }
+  @media (max-width: 1000px) {
+    .metrics { grid-template-columns: 1fr 1fr 1fr; }
+  }
+  @media (max-width: 650px) {
+    .controls { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Beta-convergencia provincial interactiva</h1>
+  <div class="subtitle">
+    Este gráfico usa tus <b>32 provincias</b> de República Dominicana, con
+    <b>densidad inicial en 2017</b> y <b>crecimiento logarítmico medio anual 2017–2024</b>.
+    Puedes cambiar la <b>velocidad de convergencia λ</b> y ver cómo cambia
+    la recta de beta-convergencia y el tiempo estimado para casi cerrar la brecha digital.
+  </div>
+
+  <div class="formula-box">
+    <div class="formula-line"><b>Ecuación estimada:</b> g<sub>i</sub> = α + β ln(D<sub>i,2017</sub>)</div>
+    <div class="formula-line"><b>Relación entre β y λ:</b> β = - (1 - e<sup>-λT</sup>) / T</div>
+    <div class="formula-line"><b>Cierre casi completo:</b> Δd = 1.01, donde Δd es el ratio máximo/mínimo de penetración de Internet fijo</div>
+    <div class="formula-line"><b>Horizonte temporal observado:</b> T = 7 años</div>
+  </div>
+
+  <div class="controls">
+    <label for="lambdaSlider">Velocidad de convergencia anual, λ</label>
+    <div class="valueBox"><span id="lambdaValue"></span></div>
+    <input id="lambdaSlider" type="range" min="0.1" max="12" step="0.1" value="3.77" />
+    <div></div>
+
+    <label for="alphaSlider">Intercepto α</label>
+    <div class="valueBox"><span id="alphaValue"></span></div>
+    <input id="alphaSlider" type="range" min="-0.08" max="0.04" step="0.001" value="-0.0234" />
+    <div></div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><span>β implícito</span><strong id="betaValue"></strong></div>
+    <div class="metric"><span>Vida media</span><strong id="halfLifeValue"></strong></div>
+    <div class="metric metric-highlight"><span>Tiempo hasta Δd = 1.01</span><strong id="nearCloseValue"></strong></div>
+    <div class="metric"><span>α (actual)</span><strong id="alphaMetric"></strong></div>
+    <div class="metric"><span>R² observado</span><strong>0.279</strong></div>
+    <div class="metric"><span>p-valor de β observado</span><strong>0.0019</strong></div>
+  </div>
+
+  <div id="chart" style="width:100%;height:720px;"></div>
+
+  <div class="note">
+    <b>Lectura:</b> los puntos son valores de <b>penetración de Internet fijo</b> a nivel provincial.
+    La línea negra representa la recta de beta-convergencia. Si aumentas λ, la pendiente β se vuelve más negativa,
+    lo que representa una convergencia más rápida. Si λ disminuye, el tiempo estimado para casi cerrar la brecha digital aumenta.
+    <br><br>
+    <b>Brecha inicial usada:</b> Δd<sub>0</sub> = máximo/mínimo en 2017 = 27.77.
+    El cierre casi completo se define como Δd = 1.01.
+    <br><br>
+    <b>Estimación observada en tus datos:</b> α = -0.0234, β = -0.0331,
+    λ ≈ 3.77% anual, vida media ≈ 18.38 años y tiempo hasta Δd = 1.01 ≈ 154 años.
+  </div>
+</div>
+
+<script>
+const dataRecords = [{'Provincia': 'AZUA', 'Region': 'VALDESIA', 'D2017': 0.023627, 'D2024': 0.056635, 'x': -3.7453651531007988, 'y': 0.1248910061101912, 'color': '#bcbd22'}, {'Provincia': 'BAHORUCO', 'Region': 'ENRIQUILLO', 'D2017': 0.012935, 'D2024': 0.02647, 'x': -4.347818463344145, 'y': 0.1022964572287168, 'color': '#8c564b'}, {'Provincia': 'BARAHONA', 'Region': 'ENRIQUILLO', 'D2017': 0.032562, 'D2024': 0.063415, 'x': -3.4246093146728143, 'y': 0.09522206603001004, 'color': '#8c564b'}, {'Provincia': 'DAJABÓN', 'Region': 'CIBAO NOROESTE', 'D2017': 0.030763, 'D2024': 0.041384, 'x': -3.481442609841585, 'y': 0.0423688090800946, 'color': '#ff7f0e'}, {'Provincia': 'DISTRITO NACIONAL', 'Region': 'OZAMA', 'D2017': 0.20183, 'D2024': 0.262662, 'x': -1.6003295200701093, 'y': 0.03763461080320767, 'color': '#7f7f7f'}, {'Provincia': 'DUARTE', 'Region': 'CIBAO NORESTE', 'D2017': 0.051288, 'D2024': 0.145957, 'x': -2.970298472297181, 'y': 0.1494078930136773, 'color': '#1f77b4'}, {'Provincia': 'EL SEIBO', 'Region': 'YUMA', 'D2017': 0.01945, 'D2024': 0.036952, 'x': -3.939908208917682, 'y': 0.09168181472340699, 'color': '#17becf'}, {'Provincia': 'ELÍAS PIÑA', 'Region': 'EL VALLE', 'D2017': 0.007267, 'D2024': 0.035703, 'x': -4.924411727347638, 'y': 0.22741302389055912, 'color': '#9467bd'}, {'Provincia': 'ESPAILLAT', 'Region': 'CIBAO NORTE', 'D2017': 0.041963, 'D2024': 0.089, 'x': -3.170967001346316, 'y': 0.10740687029947413, 'color': '#2ca02c'}, {'Provincia': 'HATO MAYOR', 'Region': 'HIGUAMO', 'D2017': 0.040396, 'D2024': 0.072467, 'x': -3.2090245088178264, 'y': 0.08348578795144526, 'color': '#e377c2'}, {'Provincia': 'HERMANAS MIRABAL', 'Region': 'CIBAO NORESTE', 'D2017': 0.052908, 'D2024': 0.079596, 'x': -2.9392007228183363, 'y': 0.05834418345251694, 'color': '#1f77b4'}, {'Provincia': 'INDEPENDENCIA', 'Region': 'ENRIQUILLO', 'D2017': 0.00784, 'D2024': 0.016042, 'x': -4.848516444619821, 'y': 0.10228163551177387, 'color': '#8c564b'}, {'Provincia': 'LA ALTAGRACIA', 'Region': 'YUMA', 'D2017': 0.079378, 'D2024': 0.153816, 'x': -2.533534027207914, 'y': 0.09450511872797322, 'color': '#17becf'}, {'Provincia': 'LA ROMANA', 'Region': 'YUMA', 'D2017': 0.095936, 'D2024': 0.145844, 'x': -2.3440739765020044, 'y': 0.05983660783310877, 'color': '#17becf'}, {'Provincia': 'LA VEGA', 'Region': 'CIBAO SUR', 'D2017': 0.05453, 'D2024': 0.086226, 'x': -2.909004270044167, 'y': 0.06546010676888495, 'color': '#d62728'}, {'Provincia': 'MARÍA TRINIDAD SÁNCHEZ', 'Region': 'CIBAO NORESTE', 'D2017': 0.045193, 'D2024': 0.113639, 'x': -3.0968130713937607, 'y': 0.13172636423435488, 'color': '#1f77b4'}, {'Provincia': 'MONSEÑOR NOUEL', 'Region': 'CIBAO SUR', 'D2017': 0.082355, 'D2024': 0.127869, 'x': -2.4967161077474977, 'y': 0.06285244730217439, 'color': '#d62728'}, {'Provincia': 'MONTE CRISTI', 'Region': 'CIBAO NOROESTE', 'D2017': 0.032877, 'D2024': 0.028568, 'x': -3.414981953832772, 'y': -0.02006944497960252, 'color': '#ff7f0e'}, {'Provincia': 'MONTE PLATA', 'Region': 'HIGUAMO', 'D2017': 0.014622, 'D2024': 0.024571, 'x': -4.225228035111013, 'y': 0.07414852026777709, 'color': '#e377c2'}, {'Provincia': 'PEDERNALES', 'Region': 'EL VALLE', 'D2017': 0.011506, 'D2024': 0.022926, 'x': -4.464886640541035, 'y': 0.09848614275024513, 'color': '#9467bd'}, {'Provincia': 'PERAVIA', 'Region': 'VALDESIA', 'D2017': 0.054274, 'D2024': 0.088703, 'x': -2.9137099880766013, 'y': 0.0701783456727898, 'color': '#bcbd22'}, {'Provincia': 'PUERTO PLATA', 'Region': 'CIBAO NORTE', 'D2017': 0.069668, 'D2024': 0.083894, 'x': -2.6640141771125987, 'y': 0.02654471361994304, 'color': '#2ca02c'}, {'Provincia': 'SAMANÁ', 'Region': 'CIBAO NORESTE', 'D2017': 0.029224, 'D2024': 0.095824, 'x': -3.5327649894891557, 'y': 0.1696461265755893, 'color': '#1f77b4'}, {'Provincia': 'SAN CRISTÓBAL', 'Region': 'VALDESIA', 'D2017': 0.049558, 'D2024': 0.077466, 'x': -3.004611578160586, 'y': 0.06381363279986939, 'color': '#bcbd22'}, {'Provincia': 'SAN JOSÉ DE OCOA', 'Region': 'VALDESIA', 'D2017': 0.029075, 'D2024': 0.06962, 'x': -3.537876580577409, 'y': 0.12473902628265211, 'color': '#bcbd22'}, {'Provincia': 'SAN JUAN', 'Region': 'EL VALLE', 'D2017': 0.03353, 'D2024': 0.077247, 'x': -3.395314718504, 'y': 0.11922393137059498, 'color': '#9467bd'}, {'Provincia': 'SAN PEDRO DE MACORÍS', 'Region': 'HIGUAMO', 'D2017': 0.079398, 'D2024': 0.124947, 'x': -2.5332820999631696, 'y': 0.06477378119570247, 'color': '#e377c2'}, {'Provincia': 'SANTIAGO', 'Region': 'CIBAO NORTE', 'D2017': 0.089419, 'D2024': 0.114947, 'x': -2.4144220914193313, 'y': 0.03587685214317255, 'color': '#2ca02c'}, {'Provincia': 'SANTIAGO RODRÍGUEZ', 'Region': 'CIBAO NOROESTE', 'D2017': 0.03762, 'D2024': 0.054925, 'x': -3.2802194551092527, 'y': 0.05406182777111278, 'color': '#ff7f0e'}, {'Provincia': 'SANTO DOMINGO', 'Region': 'OZAMA', 'D2017': 0.091919, 'D2024': 0.11941, 'x': -2.386847524526053, 'y': 0.03737931358417278, 'color': '#7f7f7f'}, {'Provincia': 'SÁNCHEZ RAMÍREZ', 'Region': 'CIBAO SUR', 'D2017': 0.03331, 'D2024': 0.06795, 'x': -3.401897626776549, 'y': 0.10184492691308066, 'color': '#d62728'}, {'Provincia': 'VALVERDE', 'Region': 'CIBAO NOROESTE', 'D2017': 0.047737, 'D2024': 0.066495, 'x': -3.042048500431414, 'y': 0.04734571118777194, 'color': '#ff7f0e'}];
+const regionColors = {'CIBAO NORESTE': '#1f77b4', 'CIBAO NOROESTE': '#ff7f0e', 'CIBAO NORTE': '#2ca02c', 'CIBAO SUR': '#d62728', 'EL VALLE': '#9467bd', 'ENRIQUILLO': '#8c564b', 'HIGUAMO': '#e377c2', 'OZAMA': '#7f7f7f', 'VALDESIA': '#bcbd22', 'YUMA': '#17becf'};
+const regions = ['CIBAO NORESTE', 'CIBAO NOROESTE', 'CIBAO NORTE', 'CIBAO SUR', 'EL VALLE', 'ENRIQUILLO', 'HIGUAMO', 'OZAMA', 'VALDESIA', 'YUMA'];
+const T = 7;
+const observedLambda = 0.037704849669884175;
+const observedAlpha = -0.0234;
+const observedBeta = -0.0331;
+const delta0 = 27.77349662859502;
+const deltaTarget = 1.01;
+
+function betaFromLambda(lambda) {
+  return -(1 - Math.exp(-lambda * T)) / T;
+}
+
+function halfLife(lambda) {
+  if (lambda <= 0) return Infinity;
+  return Math.log(2) / lambda;
+}
+
+function yearsToNearClose(lambda) {
+  if (lambda <= 0) return Infinity;
+  return Math.log(Math.log(delta0) / Math.log(deltaTarget)) / lambda;
+}
+
+function groupByRegion() {
+  const grouped = {};
+  regions.forEach(r => grouped[r] = []);
+  dataRecords.forEach(d => grouped[d.Region].push(d));
+  return grouped;
+}
+
+function regressionLine(alpha, beta) {
+  const xs = dataRecords.map(d => d.x);
+  const xmin = Math.min(...xs) - 0.12;
+  const xmax = Math.max(...xs) + 0.12;
+  const xLine = [];
+  const yLine = [];
+  const n = 100;
+  for (let i = 0; i < n; i++) {
+    const x = xmin + (xmax - xmin) * i / (n - 1);
+    xLine.push(x);
+    yLine.push(alpha + beta * x);
+  }
+  return {xLine, yLine};
+}
+
+function buildTraces(alpha, beta) {
+  const grouped = groupByRegion();
+  const traces = [];
+
+  regions.forEach(region => {
+    const arr = grouped[region];
+    traces.push({
+      x: arr.map(d => d.x),
+      y: arr.map(d => d.y),
+      mode: "markers",
+      type: "scatter",
+      name: region,
+      marker: {
+        size: 10,
+        color: regionColors[region],
+        line: {color: "#222", width: 0.7}
+      },
+      text: arr.map(d =>
+        "Provincia: " + d.Provincia +
+        "<br>Región: " + d.Region +
+        "<br>Densidad 2017: " + d.D2017.toFixed(6) +
+        "<br>Densidad 2024: " + d.D2024.toFixed(6) +
+        "<br>ln(Dᵢ,2017): " + d.x.toFixed(3) +
+        "<br>gᵢ: " + d.y.toFixed(4)
+      ),
+      hovertemplate: "%{text}<extra></extra>"
+    });
+  });
+
+  const line = regressionLine(alpha, beta);
+  traces.push({
+    x: line.xLine,
+    y: line.yLine,
+    mode: "lines",
+    type: "scatter",
+    name: "Recta de convergencia",
+    line: { color: "black", width: 3, dash: "dash" },
+    hovertemplate: "Recta: y = α + βx<extra></extra>"
+  });
+
+  return traces;
+}
+
+function updateChart() {
+  const lambdaPct = parseFloat(document.getElementById("lambdaSlider").value);
+  const alpha = parseFloat(document.getElementById("alphaSlider").value);
+
+  const lambda = lambdaPct / 100.0;
+  const beta = betaFromLambda(lambda);
+  const hl = halfLife(lambda);
+  const nearClose = yearsToNearClose(lambda);
+
+  document.getElementById("lambdaValue").innerText = lambdaPct.toFixed(2) + "%";
+  document.getElementById("alphaValue").innerText = alpha.toFixed(4);
+  document.getElementById("betaValue").innerText = beta.toFixed(4);
+  document.getElementById("halfLifeValue").innerText = Number.isFinite(hl) ? hl.toFixed(2) + " años" : "∞";
+  document.getElementById("nearCloseValue").innerText = Number.isFinite(nearClose) ? nearClose.toFixed(0) + " años" : "∞";
+  document.getElementById("alphaMetric").innerText = alpha.toFixed(4);
+
+  const traces = buildTraces(alpha, beta);
+
+  const layout = {
+    title: {
+      text: "Beta-convergencia provincial de la densidad de Internet fijo<br>República Dominicana, 2017–2024",
+      x: 0.5
+    },
+    xaxis: {
+      title: "Logaritmo de la densidad inicial en 2017, ln(Dᵢ,2017)",
+      zeroline: false,
+      gridcolor: "#e5e7eb"
+    },
+    yaxis: {
+      title: "Crecimiento logarítmico medio anual, gᵢ = [ln(Dᵢ,2024) − ln(Dᵢ,2017)] / 7",
+      zeroline: false,
+      gridcolor: "#e5e7eb"
+    },
+    hovermode: "closest",
+    template: "plotly_white",
+    legend: {
+      orientation: "v",
+      x: 1.02,
+      y: 1,
+      bgcolor: "rgba(255,255,255,0.8)"
+    },
+    margin: {l: 90, r: 200, t: 90, b: 90},
+    annotations: [
+      {
+        xref: "paper",
+        yref: "paper",
+        x: 0.01,
+        y: 0.99,
+        xanchor: "left",
+        yanchor: "top",
+        align: "left",
+        showarrow: false,
+        text:
+          "Regresión observada OLS:<br>" +
+          "gᵢ = α + β ln(Dᵢ,2017) + εᵢ<br>" +
+          "α = " + observedAlpha.toFixed(4) + "<br>" +
+          "β = " + observedBeta.toFixed(4) + " (p = 0.0019)<br>" +
+          "R² = 0.279<br>" +
+          "λ ≈ " + (observedLambda * 100).toFixed(2) + "% anual<br>" +
+          "Vida media ≈ 18.38 años<br>" +
+          "Δd₀ = " + delta0.toFixed(2) + "; Δd objetivo = " + deltaTarget.toFixed(2),
+        bordercolor: "#999",
+        borderwidth: 1,
+        bgcolor: "rgba(255,255,255,0.92)",
+        font: {size: 12}
+      },
+      {
+        xref: "paper",
+        yref: "paper",
+        x: 0.01,
+        y: -0.16,
+        xanchor: "left",
+        yanchor: "top",
+        showarrow: false,
+        text: "Interpretación: las provincias con menor densidad inicial tienden a registrar mayor crecimiento posterior cuando β es negativo.",
+        font: {size: 12, color: "#333"}
+      }
+    ]
+  };
+
+  Plotly.react("chart", traces, layout, {responsive: true});
+}
+
+document.getElementById("lambdaSlider").addEventListener("input", updateChart);
+document.getElementById("alphaSlider").addEventListener("input", updateChart);
+updateChart();
+</script>
+</body>
+</html>
